@@ -23,7 +23,36 @@ function App() {
   const [currentLargeImg, setCurrentLargeImg] = useState('');
 
   useEffect(() => {
-    if (query) {
+    async function fetchImages() {
+      try {
+        setStatus('pending');
+
+        await pixabayAPI(query, page).then(res => {
+          let getData = res.data.hits;
+          let mapData = mapper(getData);
+
+          if (mapData.length === 0) {
+            toast.error(
+              'Sorry, there are no images matching your search query. Please try again.'
+            );
+          } else {
+            setImages(prevState => [...prevState, ...mapData]);
+          }
+        });
+      } catch (error) {
+        toast.warn(
+          "We're sorry, but you've reached the end of search results."
+        );
+      } finally {
+        setStatus('resolved');
+
+        if (page > 1) {
+          setTimeout(smoothScroll, 250);
+        }
+      }
+    }
+
+    if (query !== '') {
       fetchImages();
     }
   }, [query, page]);
@@ -31,33 +60,6 @@ function App() {
   useEffect(() => {
     pageHeader();
   });
-
-  const fetchImages = async () => {
-    try {
-      setStatus('pending');
-
-      await pixabayAPI(query, page).then(res => {
-        let getData = res.data.hits;
-        let mapData = mapper(getData);
-
-        if (mapData.length === 0) {
-          toast.error(
-            'Sorry, there are no images matching your search query. Please try again.'
-          );
-        } else {
-          setImages(prevState => [...prevState, ...mapData]);
-        }
-      });
-    } catch (error) {
-      toast.warn("We're sorry, but you've reached the end of search results.");
-    } finally {
-      setStatus('resolved');
-
-      if (page > 1) {
-        setTimeout(smoothScroll, 250);
-      }
-    }
-  };
 
   const handleLoadMore = e => {
     e.preventDefault();
