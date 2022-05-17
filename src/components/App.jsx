@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -13,111 +13,79 @@ import Modal from './Modal';
 import Loader from './Loader/Loader';
 import styles from './App.module.css';
 
-class App extends Component {
-  state = {
-    isShow: false,
-    searchQuery: '',
-    serchResult: [],
-    page: 1,
-    status: 'idle',
-    currentImgTag: '',
-    currentLargeImg: '',
-  };
+function App() {
+  const [modal, setModal] = useState(false);
+  const [query, setQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState('idle');
+  const [currentImgTag, setCurrentImgTag] = useState('');
+  const [currentLargeImg, setCurrentLargeImg] = useState('');
 
-  componentDidUpdate(prevProps, prevState) {
-    const { searchQuery, page } = this.state;
-
-    if (prevState.searchQuery !== searchQuery || prevState.page !== page) {
-      this.fetchImages();
+  useEffect(() => {
+    if (query) {
+      fetchImages();
     }
-  }
+  }, [query, page]);
 
-  componentDidMount() {
-    this.pageHeader();
-  }
+  useEffect(() => {
+    pageHeader();
+  });
 
-  fetchImages = async () => {
-    const { searchQuery, page } = this.state;
-
+  const fetchImages = async () => {
     try {
-      this.setState({ status: 'pending' });
+      setStatus('pending');
 
-      await pixabayAPI(searchQuery, page).then(res => {
+      await pixabayAPI(query, page).then(res => {
         let getData = res.data.hits;
         let mapData = mapper(getData);
 
         if (mapData.length === 0) {
           toast.error(
-            'Sorry, there are no images matching your search query. Please try again.',
-            {
-              position: 'top-right',
-              autoClose: 3000,
-              hideProgressBar: false,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-              progress: undefined,
-            }
+            'Sorry, there are no images matching your search query. Please try again.'
           );
         } else {
-          this.setState(prevState => ({
-            serchResult: [...prevState.serchResult, ...mapData],
-          }));
+          setImages(prevState => [...prevState, ...mapData]);
         }
       });
     } catch (error) {
-      toast.warn("We're sorry, but you've reached the end of search results.", {
-        position: 'top-right',
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-      });
+      toast.warn("We're sorry, but you've reached the end of search results.");
     } finally {
-      this.setState({ status: 'resolved' });
+      setStatus('resolved');
 
       if (page > 1) {
-        setTimeout(this.smoothScroll, 250);
+        setTimeout(smoothScroll, 250);
       }
     }
   };
 
-  handleLoadMore = e => {
-    const { page } = this.state;
-
+  const handleLoadMore = e => {
     e.preventDefault();
 
-    this.setState({ page: page + 1 });
+    setPage(prevState => prevState + 1);
   };
 
-  onToggle = () => {
-    this.setState(({ isShow }) => ({ isShow: !isShow }));
+  const onToggle = () => {
+    setModal(prevState => !prevState);
   };
 
-  handleFormSubmit = searchQuery => {
-    this.setState({ searchQuery, page: 1, serchResult: [] });
+  const handleFormSubmit = searchQuery => {
+    setQuery(searchQuery);
+    setPage(1);
+    setImages([]);
   };
 
-  onClickImg = e => {
+  const onClickImg = e => {
     const currentImgTag = e.target.alt;
     const currentLargeImg = e.target.dataset.source;
 
-    this.setState({ currentImgTag, currentLargeImg });
+    setCurrentImgTag(currentImgTag);
+    setCurrentLargeImg(currentLargeImg);
 
-    this.onToggle();
+    onToggle();
   };
 
-  pageHeader = () => {
-    const { height: pageHeaderHeight } = document
-      .querySelector('#header')
-      .getBoundingClientRect();
-
-    document.body.style.paddingTop = `${pageHeaderHeight}px`;
-  };
-
-  smoothScroll = () => {
+  const smoothScroll = () => {
     let scrollHeight = document.documentElement.scrollHeight;
 
     window.scrollTo({
@@ -126,55 +94,51 @@ class App extends Component {
     });
   };
 
-  render() {
-    const { serchResult, status, isShow, currentImgTag, currentLargeImg } =
-      this.state;
+  const pageHeader = () => {
+    const { height: pageHeaderHeight } = document
+      .querySelector('#header')
+      .getBoundingClientRect();
 
-    return (
-      <Container>
-        <Searchbar onSubmit={this.handleFormSubmit} />
+    document.body.style.paddingTop = `${pageHeaderHeight}px`;
+  };
 
-        {status === 'idle' && (
-          <div className={styles.notification}>
-            Gallery is empty, search for images.
-          </div>
-        )}
+  return (
+    <Container>
+      <Searchbar onSubmit={handleFormSubmit} />
 
-        {serchResult.length > 0 && (
-          <ImageGallery
-            serchResult={serchResult}
-            onClickImg={this.onClickImg}
-          />
-        )}
+      {status === 'idle' && (
+        <div className={styles.notification}>
+          Gallery is empty, search for images.
+        </div>
+      )}
 
-        {status === 'pending' && <Loader />}
+      {images.length > 0 && (
+        <ImageGallery serchResult={images} onClickImg={onClickImg} />
+      )}
 
-        {serchResult.length > 0 && status === 'resolved' && (
-          <Button loadMore={this.handleLoadMore} />
-        )}
+      {status === 'pending' && <Loader />}
 
-        {isShow && (
-          <Modal
-            onClose={this.onToggle}
-            src={currentLargeImg}
-            alt={currentImgTag}
-          />
-        )}
+      {images.length > 0 && status === 'resolved' && (
+        <Button loadMore={handleLoadMore} />
+      )}
 
-        <ToastContainer
-          position="bottom-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-        />
-      </Container>
-    );
-  }
+      {modal && (
+        <Modal onClose={onToggle} src={currentLargeImg} alt={currentImgTag} />
+      )}
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </Container>
+  );
 }
 
 export default App;
